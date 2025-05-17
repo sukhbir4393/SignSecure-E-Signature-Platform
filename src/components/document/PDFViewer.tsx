@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import * as pdfjsLib from 'pdfjs-dist';
-import { Document as PDFDocument } from '@react-pdf/renderer';
+import React, { useState, useRef } from 'react';
+import { Document, Page ,pdfjs} from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
 
-// Initialize PDF.js worker with the correct version
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js`;
+// Set up the worker
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/legacy/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString();
 
 interface PDFViewerProps {
   fileUrl: string;
@@ -26,78 +30,48 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   isEditable = false,
   onClick
 }) => {
-  const [pdfDocument, setPdfDocument] = useState<pdfjsLib.PDFDocumentProxy | null>(null);
-  const [totalPages, setTotalPages] = useState(0);
-  const [renderComplete, setRenderComplete] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  console.log('PDFViewer fileUrl',fileUrl)
+  
+  const [numPages, setNumPages] = useState<number>(0);
+  const [pageNumber, setPageNumber] = useState<number>(1);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const loadPdf = async () => {
-      try {
-        const loadingTask = pdfjsLib.getDocument(fileUrl);
-        const pdf = await loadingTask.promise;
-        setPdfDocument(pdf);
-        setTotalPages(pdf.numPages);
-        if (onTotalPagesChange) {
-          onTotalPagesChange(pdf.numPages);
-        }
-      } catch (error) {
-        console.error('Error loading PDF:', error);
-      }
-    };
-
-    loadPdf();
-  }, [fileUrl, onTotalPagesChange]);
-
-  useEffect(() => {
-    const renderPage = async () => {
-      if (!pdfDocument || !canvasRef.current) return;
-
-      try {
-        setRenderComplete(false);
-        const page = await pdfDocument.getPage(currentPage);
-        
-        const viewport = page.getViewport({ scale });
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
-        
-        if (!context) return;
-        
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        
-        const renderContext = {
-          canvasContext: context,
-          viewport,
-        };
-        
-        await page.render(renderContext).promise;
-        setRenderComplete(true);
-      } catch (error) {
-        console.error('Error rendering PDF page:', error);
-      }
-    };
-
-    renderPage();
-  }, [pdfDocument, currentPage, scale]);
+  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+    console.log('PDFViewer',numPages)
+    setNumPages(numPages);
+    if (onTotalPagesChange) {
+      onTotalPagesChange(numPages);
+    }
+  };
 
   return (
     <div className="pdf-viewer relative" ref={containerRef}>
-      <canvas 
-        ref={canvasRef} 
-        className={`mx-auto shadow-md ${isEditable ? 'cursor-crosshair' : ''}`}
+      <div 
+        className={`relative ${isEditable ? 'cursor-crosshair' : ''}`}
         onClick={onClick}
-      />
+      >
+        <Document
+          file={fileUrl}
+          onLoadSuccess={onDocumentLoadSuccess}
+          className="mx-auto shadow-md"
+        >
+          <Page 
+            pageNumber={pageNumber} 
+            scale={scale}
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
+          />
+        </Document>
+      </div>
       
-      {renderComplete && children && (
+      {children && (
         <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none">
           {children}
         </div>
       )}
       
       {/* Navigation controls */}
-      {totalPages > 1 && (
+      {numPages > 1 && (
         <div className="mt-4 flex justify-center items-center space-x-4">
           <button
             className="px-3 py-1 bg-gray-200 rounded-md text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -107,11 +81,11 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
             Previous
           </button>
           <span className="text-sm">
-            Page {currentPage} of {totalPages}
+            Page {currentPage} of {numPages}
           </span>
           <button
             className="px-3 py-1 bg-gray-200 rounded-md text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={currentPage >= totalPages}
+            disabled={currentPage >= numPages}
             onClick={() => onPageChange && onPageChange(currentPage + 1)}
           >
             Next
