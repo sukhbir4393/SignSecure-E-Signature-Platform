@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, FileSignature as Signature, FileText, Calendar, CheckSquare, Edit, UserPlus, Save, Send } from 'lucide-react';
+import { ChevronLeft, Plus, FileSignature as Signature, FileText, Calendar, CheckSquare, Edit, UserPlus, Save, Send, Move } from 'lucide-react';
 import { useDocuments } from '../../contexts/DocumentContext';
 import { FormField, Signer } from '../../types';
 import Card, { CardBody, CardHeader, CardFooter } from '../../components/ui/Card';
@@ -8,8 +8,9 @@ import Button from '../../components/ui/Button';
 import PDFViewer from '../../components/document/PDFViewer';
 import SignatureField from '../../components/document/SignatureField';
 import SignersList from '../../components/document/SignersList';
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
 
-type ToolType = 'signature' | 'text' | 'date' | 'checkbox' | 'initial';
+type ToolType = 'signature' | 'text' | 'date' | 'checkbox' | 'initial' | 'move';
 
 const DocumentEditor: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,8 +21,8 @@ const DocumentEditor: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [scale, setScale] = useState(1.0);
-  const [selectedTool, setSelectedTool] = useState<ToolType | null>(null);
   const [selectedField, setSelectedField] = useState<string | null>(null);
+  const [selectedTool, setSelectedTool] = useState<ToolType | null>(null);
   const [selectedSigner, setSelectedSigner] = useState<string | null>(null);
   const [isSignersOpen, setIsSignersOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -39,6 +40,23 @@ const DocumentEditor: React.FC = () => {
       navigate('/documents');
     }
   }, [id, getDocument, navigate]);
+
+  // Update selected field when tool changes
+  useEffect(() => {
+    if (selectedTool === 'move') {
+      // Don't clear selection when move tool is selected
+      return;
+    }
+    setSelectedField(null);
+  }, [selectedTool]);
+
+  const handleSelectedField = (fieldId: string | null) => {
+    setSelectedField(fieldId);
+    // If a field is selected, deselect the move tool
+    if (fieldId && selectedTool === 'move') {
+      setSelectedTool(null);
+    }
+  };
   
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -79,6 +97,9 @@ const DocumentEditor: React.FC = () => {
   const handlePDFClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!selectedTool || !selectedSigner) return;
     
+    // If move tool is selected, don't add new fields
+    if (selectedTool === 'move') return;
+    
     const canvas = event.currentTarget as HTMLElement;
     const rect = canvas.getBoundingClientRect();
     
@@ -114,7 +135,7 @@ const DocumentEditor: React.FC = () => {
       const updatedFields = document.fields.filter(field => field.id !== fieldId);
       const updatedDoc = await updateDocument(document.id, { fields: updatedFields });
       setDocument(updatedDoc);
-      setSelectedField(null);
+      handleSelectedField(null);
     } catch (error) {
       console.error('Failed to remove field:', error);
     }
@@ -213,6 +234,41 @@ const DocumentEditor: React.FC = () => {
     }
   };
   
+  const handleFieldUpdate = async (fieldId: string, updates: Partial<FormField>) => {
+    console.log('handleFieldUpdate fieldId updates document',fieldId,updates,document);
+    
+    if (!document) return;
+    console.log('handleFieldUpdate document ',document);
+    
+    try {
+      const updatedFields = document.fields.map(field => 
+        field.id === fieldId ? { ...field, ...updates } : field
+      );
+    console.log('handleFieldUpdate updatedFields',updatedFields);
+      
+      const updatedDoc = await updateDocument(document.id, { fields: updatedFields });
+      setDocument(updatedDoc);
+    } catch (error) {
+      console.error('Failed to update field:', error);
+    }
+  };
+  
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, delta } = event;
+    const fieldId = active.id as string;
+    
+    if (!document) return;
+    
+    // Find the field being dragged
+    const field = document.fields.find(f => f.id === fieldId);
+    if (field) {
+      handleFieldUpdate(fieldId, {
+        x: field.x + delta.x,
+        y: field.y + delta.y
+      });
+    }
+  };
+  
   if (isLoading || !document) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -222,229 +278,249 @@ const DocumentEditor: React.FC = () => {
   }
   
   return (
-    <div className="animate-fade-in space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center">
-          <Button
-            variant="ghost"
-            className="mr-2"
-            onClick={() => navigate('/documents')}
-            leftIcon={<ChevronLeft className="h-4 w-4" />}
-          >
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 truncate max-w-md">{document.title}</h1>
-            <p className="text-gray-600">{document.description}</p>
+    <DndContext onDragEnd={handleDragEnd}>
+      <div className="animate-fade-in space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              className="mr-2"
+              onClick={() => navigate('/documents')}
+              leftIcon={<ChevronLeft className="h-4 w-4" />}
+            >
+              Back
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 truncate max-w-md">{document.title}</h1>
+              <p className="text-gray-600">{document.description}</p>
+            </div>
+          </div>
+          <div className="flex space-x-3">
+            <Button
+              variant="outline"
+              onClick={handleSaveDocument}
+              isLoading={isSaving}
+              leftIcon={<Save className="h-4 w-4" />}
+            >
+              Save
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleSendDocument}
+              isLoading={isSending}
+              leftIcon={<Send className="h-4 w-4" />}
+            >
+              Send for Signature
+            </Button>
           </div>
         </div>
-        <div className="flex space-x-3">
-          <Button
-            variant="outline"
-            onClick={handleSaveDocument}
-            isLoading={isSaving}
-            leftIcon={<Save className="h-4 w-4" />}
-          >
-            Save
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSendDocument}
-            isLoading={isSending}
-            leftIcon={<Send className="h-4 w-4" />}
-          >
-            Send for Signature
-          </Button>
-        </div>
-      </div>
-      
-      {/* Editor layout */}
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left panel - Tools and signers */}
-        <div className="w-full lg:w-64 space-y-6">
-          {/* Tools panel */}
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-medium text-gray-900">Field Tools</h2>
-            </CardHeader>
-            <CardBody className="space-y-4">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  className={`p-2 flex flex-col items-center rounded border text-sm
-                    ${selectedTool === 'signature' 
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 hover:bg-gray-50 text-gray-700'
-                    }
-                  `}
-                  onClick={() => setSelectedTool('signature')}
-                  disabled={!selectedSigner}
-                >
-                  <Signature className="h-5 w-5 mb-1" />
-                  Signature
-                </button>
-                <button
-                  className={`p-2 flex flex-col items-center rounded border text-sm
-                    ${selectedTool === 'initial' 
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 hover:bg-gray-50 text-gray-700'
-                    }
-                  `}
-                  onClick={() => setSelectedTool('initial')}
-                  disabled={!selectedSigner}
-                >
-                  <Edit className="h-5 w-5 mb-1" />
-                  Initial
-                </button>
-                <button
-                  className={`p-2 flex flex-col items-center rounded border text-sm
-                    ${selectedTool === 'date' 
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 hover:bg-gray-50 text-gray-700'
-                    }
-                  `}
-                  onClick={() => setSelectedTool('date')}
-                  disabled={!selectedSigner}
-                >
-                  <Calendar className="h-5 w-5 mb-1" />
-                  Date
-                </button>
-                <button
-                  className={`p-2 flex flex-col items-center rounded border text-sm
-                    ${selectedTool === 'text' 
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 hover:bg-gray-50 text-gray-700'
-                    }
-                  `}
-                  onClick={() => setSelectedTool('text')}
-                  disabled={!selectedSigner}
-                >
-                  <FileText className="h-5 w-5 mb-1" />
-                  Text
-                </button>
-                <button
-                  className={`p-2 flex flex-col items-center rounded border text-sm
-                    ${selectedTool === 'checkbox' 
-                      ? 'border-primary-500 bg-primary-50 text-primary-700'
-                      : 'border-gray-200 hover:bg-gray-50 text-gray-700'
-                    }
-                  `}
-                  onClick={() => setSelectedTool('checkbox')}
-                  disabled={!selectedSigner}
-                >
-                  <CheckSquare className="h-5 w-5 mb-1" />
-                  Checkbox
-                </button>
-                {/* Empty space to keep grid even */}
-                <div className="invisible"></div>
-              </div>
-              
-              {!selectedSigner && (
-                <div className="bg-warning-50 text-warning-800 p-2 rounded text-sm">
-                  Select a signer before adding fields
-                </div>
-              )}
-            </CardBody>
-          </Card>
-          
-          {/* Signers panel */}
-          <Card>
-            <CardBody>
-              <SignersList
-                signers={document.signers}
-                onAddSigner={handleAddSigner}
-                onRemoveSigner={handleRemoveSigner}
-              />
-              
-              {document.signers.length > 0 && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Signer</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {document.signers.map(signer => (
-                      <button
-                        key={signer.id}
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-sm
-                          ${selectedSigner === signer.id 
-                            ? 'bg-primary-100 text-primary-800 border-2 border-primary-300'
-                            : 'bg-gray-100 text-gray-800 border border-gray-200 hover:bg-gray-200'
-                          }
-                        `}
-                        onClick={() => setSelectedSigner(signer.id)}
-                      >
-                        {signer.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </div>
         
-        {/* Main content - PDF viewer */}
-        <div className="flex-1">
-          <Card className="overflow-hidden">
-            <CardBody className="p-4">
-              <PDFViewer
-                fileUrl={document.fileUrl}
-                currentPage={currentPage}
-                scale={scale}
-                onTotalPagesChange={setTotalPages}
-                onPageChange={handlePageChange}
-                isEditable={true}
-                onClick={handlePDFClick}
-              >
-                {/* Render existing fields for the current page */}
-                {document.fields
-                  .filter(field => field.page === currentPage)
-                  .map(field => (
-                    <SignatureField
-                      key={field.id}
-                      field={field}
-                      isSelected={selectedField === field.id}
-                      isEditable={true}
-                      onClick={() => setSelectedField(field.id)}
-                      onRemove={() => handleRemoveField(field.id)}
-                    />
-                  ))}
-              </PDFViewer>
-            </CardBody>
-            <CardFooter className="bg-gray-50 border-t border-gray-200 flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setScale(scale - 0.1)}
-                  disabled={scale <= 0.5}
-                >
-                  Zoom Out
-                </Button>
-                <span className="text-sm text-gray-600">{Math.round(scale * 100)}%</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setScale(scale + 0.1)}
-                  disabled={scale >= 2.0}
-                >
-                  Zoom In
-                </Button>
-              </div>
-              <div className="text-sm text-gray-600">
-                {selectedTool ? (
-                  <span className="text-primary-600">
-                    Click on the document to place a {selectedTool} field
-                  </span>
-                ) : (
-                  <span>
-                    Select a tool and click on the document to add fields
-                  </span>
+        {/* Editor layout */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left panel - Tools and signers */}
+          <div className="w-full lg:w-64 space-y-6">
+            {/* Tools panel */}
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-medium text-gray-900">Field Tools</h2>
+              </CardHeader>
+              <CardBody className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    className={`p-2 flex flex-col items-center rounded border text-sm
+                      ${selectedTool === 'move' 
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                      }
+                    `}
+                    onClick={() => setSelectedTool('move')}
+                  >
+                    <Move className="h-5 w-5 mb-1" />
+                    Move
+                  </button>
+                  <button
+                    className={`p-2 flex flex-col items-center rounded border text-sm
+                      ${selectedTool === 'signature' 
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                      }
+                    `}
+                    onClick={() => setSelectedTool('signature')}
+                    disabled={!selectedSigner}
+                  >
+                    <Signature className="h-5 w-5 mb-1" />
+                    Signature
+                  </button>
+                  <button
+                    className={`p-2 flex flex-col items-center rounded border text-sm
+                      ${selectedTool === 'initial' 
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                      }
+                    `}
+                    onClick={() => setSelectedTool('initial')}
+                    disabled={!selectedSigner}
+                  >
+                    <Edit className="h-5 w-5 mb-1" />
+                    Initial
+                  </button>
+                  <button
+                    className={`p-2 flex flex-col items-center rounded border text-sm
+                      ${selectedTool === 'date' 
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                      }
+                    `}
+                    onClick={() => setSelectedTool('date')}
+                    disabled={!selectedSigner}
+                  >
+                    <Calendar className="h-5 w-5 mb-1" />
+                    Date
+                  </button>
+                  <button
+                    className={`p-2 flex flex-col items-center rounded border text-sm
+                      ${selectedTool === 'text' 
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                      }
+                    `}
+                    onClick={() => setSelectedTool('text')}
+                    disabled={!selectedSigner}
+                  >
+                    <FileText className="h-5 w-5 mb-1" />
+                    Text
+                  </button>
+                  <button
+                    className={`p-2 flex flex-col items-center rounded border text-sm
+                      ${selectedTool === 'checkbox' 
+                        ? 'border-primary-500 bg-primary-50 text-primary-700'
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-700'
+                      }
+                    `}
+                    onClick={() => setSelectedTool('checkbox')}
+                    disabled={!selectedSigner}
+                  >
+                    <CheckSquare className="h-5 w-5 mb-1" />
+                    Checkbox
+                  </button>
+                  {/* Empty space to keep grid even */}
+                  <div className="invisible"></div>
+                </div>
+                
+                {!selectedSigner && (
+                  <div className="bg-warning-50 text-warning-800 p-2 rounded text-sm">
+                    Select a signer before adding fields
+                  </div>
                 )}
-              </div>
-            </CardFooter>
-          </Card>
+              </CardBody>
+            </Card>
+            
+            {/* Signers panel */}
+            <Card>
+              <CardBody>
+                <SignersList
+                  signers={document.signers}
+                  onAddSigner={handleAddSigner}
+                  onRemoveSigner={handleRemoveSigner}
+                />
+                
+                {document.signers.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Signer</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {document.signers.map(signer => (
+                        <button
+                          key={signer.id}
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-sm
+                            ${selectedSigner === signer.id 
+                              ? 'bg-primary-100 text-primary-800 border-2 border-primary-300'
+                              : 'bg-gray-100 text-gray-800 border border-gray-200 hover:bg-gray-200'
+                            }
+                          `}
+                          onClick={() => setSelectedSigner(signer.id)}
+                        >
+                          {signer.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          </div>
+          
+          {/* Main content - PDF viewer */}
+          <div className="flex-1">
+            <Card className="overflow-hidden">
+              <CardBody className="p-4">
+                <div className="relative">
+                  <PDFViewer
+                    fileUrl={document.fileUrl}
+                    currentPage={currentPage}
+                    scale={scale}
+                    onTotalPagesChange={setTotalPages}
+                    onPageChange={handlePageChange}
+                    isEditable={true}
+                    onClick={handlePDFClick}
+                  >
+                    {/* Render existing fields for the current page */}
+                    <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none">
+                      {document.fields
+                        .filter(field => field.page === currentPage)
+                        .map(field => (
+                          <SignatureField
+                            key={field.id}
+                            field={field}
+                            isSelected={selectedField === field.id}
+                            isEditable={true}
+                            onClick={() => handleSelectedField(field.id)}
+                            onRemove={() => handleRemoveField(field.id)}
+                            onUpdate={(updates) => handleFieldUpdate(field.id, updates)}
+                            selectedTool={selectedTool}
+                          />
+                        ))}
+                    </div>
+                  </PDFViewer>
+                </div>
+              </CardBody>
+              <CardFooter className="bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setScale(scale - 0.1)}
+                    disabled={scale <= 0.5}
+                  >
+                    Zoom Out
+                  </Button>
+                  <span className="text-sm text-gray-600">{Math.round(scale * 100)}%</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setScale(scale + 0.1)}
+                    disabled={scale >= 2.0}
+                  >
+                    Zoom In
+                  </Button>
+                </div>
+                <div className="text-sm text-gray-600">
+                  {selectedTool ? (
+                    <span className="text-primary-600">
+                      Click on the document to place a {selectedTool} field
+                    </span>
+                  ) : (
+                    <span>
+                      Select a tool and click on the document to add fields
+                    </span>
+                  )}
+                </div>
+              </CardFooter>
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
+    </DndContext>
   );
 };
 

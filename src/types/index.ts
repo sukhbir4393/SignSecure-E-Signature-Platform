@@ -20,7 +20,7 @@ export interface Signer {
 
 export interface FormField {
   id: string;
-  type: 'signature' | 'text' | 'date' | 'checkbox' | 'initial';
+  type: 'signature' | 'text' | 'date' | 'checkbox' | 'initial' | 'move';
   x: number;
   y: number;
   width: number;
