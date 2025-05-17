@@ -81,7 +81,7 @@ const SignatureField: React.FC<SignatureFieldProps> = ({
         return null;
     }
   };
-  
+  console.log('SignatureField',field)
   return (
     <div
       className={`

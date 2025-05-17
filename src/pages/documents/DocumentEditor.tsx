@@ -27,6 +27,8 @@ const DocumentEditor: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   console.log('DocumentEditor: document',document)
+  console.log('DocumentEditor: document',selectedTool)
+
   // Update local document when it changes in context
   useEffect(() => {
     const updatedDoc = getDocument(id || '');
@@ -45,6 +47,7 @@ const DocumentEditor: React.FC = () => {
   };
   
   const handleAddField = async (x: number, y: number) => {
+    console.log('x',x,'y', y)
     if (!document || !selectedTool || !selectedSigner) return;
     
     const field: Partial<FormField> = {
