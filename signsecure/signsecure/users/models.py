@@ -1,16 +1,17 @@
-
 from typing import ClassVar
 
 from django.contrib.auth.models import AbstractUser
-from django.db.models import CharField
+from django.db.models import CharField, DateField
 from django.db.models import EmailField
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 
+from core.models import BaseModel
 from .managers import UserManager
 
 
-class User(AbstractUser):
+class User(BaseModel,AbstractUser):
     """
     Default custom user model for SignSecure E Signature Platform.
     If adding fields that need to be filled at user signup,

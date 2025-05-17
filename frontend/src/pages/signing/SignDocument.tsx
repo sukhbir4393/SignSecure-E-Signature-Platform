@@ -8,14 +8,15 @@ import PDFViewer from '../../components/document/PDFViewer';
 import SignatureField from '../../components/document/SignatureField';
 import SignaturePad from '../../components/document/SignatureCanvas';
 import Input from '../../components/ui/Input';
-import { FormField } from '../../types';
+import { FormField ,Document} from '../../types';
 
 const SignDocument: React.FC = () => {
   const { documentId, token } = useParams<{ documentId: string; token: string }>();
   const navigate = useNavigate();
   const { getDocument, signDocument } = useDocuments();
   
-  const [document, setDocument] = useState(getDocument(documentId || ''));
+  // const [document, setDocument] = useState(getDocument(documentId || ''));
+  const [document, setDocument] = useState<Document>();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [scale, setScale] = useState(1.0);

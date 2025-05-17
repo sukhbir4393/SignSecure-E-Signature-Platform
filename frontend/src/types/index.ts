@@ -3,8 +3,9 @@ export interface User {
   email: string;
   name: string;
   avatar?: string;
-  role: 'admin' | 'user';
+  role: 'user' | 'admin';
   createdAt: string;
+  modifiedAt: string;
 }
 
 export interface Signer {
@@ -36,16 +37,16 @@ export interface Document {
   id: string;
   title: string;
   description?: string;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  modified_at: string;
   ownerId: string;
   status: 'draft' | 'sent' | 'completed' | 'declined' | 'expired';
-  expiresAt?: string;
-  fileUrl: string;
+  expires_at?: string;
+  file: string;
   fileType: string;
   signers: Signer[];
   fields: FormField[];
-  auditTrail: AuditEvent[];
+  audit_trail: AuditEvent[];
 }
 
 export interface AuditEvent {

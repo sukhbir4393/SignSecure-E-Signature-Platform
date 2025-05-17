@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { User } from '../types';
-import { mockUsers } from '../data/mockData';
+import api from '../config/api';
+import { AuthResponse, UserResponse } from '../types/api';
 
 interface UserContextType {
   currentUser: User | null;
@@ -20,7 +21,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Check for stored user in localStorage
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const token = localStorage.getItem('token');
+    if (storedUser && token) {
       setCurrentUser(JSON.parse(storedUser));
     }
     setIsLoading(false);
@@ -29,20 +31,35 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      // In a real app, this would be an API call to your backend
-      const user = mockUsers.find(u => u.email === email);
+      const response = await api.post<AuthResponse>('/auth-token/', {
+        username: email,
+        password: password,
+      });
+
+      const { token } = response.data;
       
-      if (!user) {
-        throw new Error('Invalid credentials');
-      }
-      
-      // Store in localStorage for persistence
+      // Get user details
+      const userResponse = await api.get<UserResponse>('/users/me/', {
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+      });
+
+      const user: User = {
+        id: userResponse.data.id || '',
+        email: userResponse.data.email || '',
+        name: userResponse.data.name || '',
+        role: (userResponse.data.role as 'user' | 'admin') || 'user',
+        createdAt: userResponse.data.created_at || new Date().toISOString(),
+      };
+
+      // Store token and user in localStorage
+      localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
       setCurrentUser(user);
     } catch (error) {
       console.error('Login failed:', error);
-      throw error;
+      throw new Error('Invalid credentials');
     } finally {
       setIsLoading(false);
     }
@@ -51,19 +68,23 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      // In a real app, this would be an API call to your backend
-      const newUser: User = {
-        id: `user-${Date.now()}`,
-        email,
+      const response = await api.post<UserResponse>('/users/', {
         name,
-        role: 'user',
-        createdAt: new Date().toISOString(),
+        email,
+        password,
+      });
+
+      const user: User = {
+        id: response.data.id || '',
+        email: response.data.email || '',
+        name: response.data.name || '',
+        role: (response.data.role as 'user' | 'admin') || 'user',
+        createdAt: response.data.created_at || new Date().toISOString(),
       };
-      
-      // Store in localStorage for persistence
-      localStorage.setItem('user', JSON.stringify(newUser));
-      setCurrentUser(newUser);
+
+      // Store user in localStorage
+      localStorage.setItem('user', JSON.stringify(user));
+      setCurrentUser(user);
     } catch (error) {
       console.error('Registration failed:', error);
       throw error;
@@ -74,6 +95,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     setCurrentUser(null);
   };
 

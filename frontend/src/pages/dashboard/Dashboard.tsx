@@ -21,7 +21,7 @@ const Dashboard: React.FC = () => {
   
   // Get recent documents (up to 5)
   const recentDocuments = [...documents]
-    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
     .slice(0, 5);
   
   // Get documents waiting for signatures
@@ -136,7 +136,8 @@ const Dashboard: React.FC = () => {
                               {doc.title}
                             </Link>
                             <p className="text-sm text-gray-500">
-                              Updated {format(new Date(doc.updatedAt), 'MMM d, yyyy')}
+                              {/* Updated {format(new Date(doc.modifiedAt), 'MMM d, yyyy')} */}
+                              Updated {doc.modifiedAt}
                             </p>
                           </div>
                         </div>

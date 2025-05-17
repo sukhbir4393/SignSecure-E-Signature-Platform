@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { 
-  ChevronLeft, 
-  Download, 
-  Send, 
-  Clock, 
-  CheckCircle, 
-  AlertTriangle, 
-  File, 
+import {
+  ChevronLeft,
+  Download,
+  Send,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  File,
   Activity
 } from 'lucide-react';
 import { useDocuments } from '../../contexts/DocumentContext';
@@ -18,47 +18,76 @@ import PDFViewer from '../../components/document/PDFViewer';
 import SignatureField from '../../components/document/SignatureField';
 import SignersList from '../../components/document/SignersList';
 import { format } from 'date-fns';
+import { Document, } from '../../types';
 
 const DocumentView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getDocument, sendDocument, isLoading } = useDocuments();
-  
-  const [document, setDocument] = useState(getDocument(id || ''));
+
+  const [document, setDocument] = useState<Document>();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [scale, setScale] = useState(1.0);
   const [isAuditTrailOpen, setIsAuditTrailOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  
+  const [isLoadingDocument, setIsLoadingDocument] = useState(true);
+
   // Update local document when it changes in context
   useEffect(() => {
-    const updatedDoc = getDocument(id || '');
-    if (updatedDoc) {
-      setDocument(updatedDoc);
-    } else {
-      // Document not found, redirect to documents list
-      navigate('/documents');
+    let isMounted = true;
+
+    const fetchDocument = async () => {
+      if (!id) return;
+      
+      try {
+        setIsLoadingDocument(true);
+        const updatedDoc = await getDocument(id);
+        if (isMounted) {
+          if (updatedDoc) {
+            setDocument(updatedDoc);
+          } else {
+            // Document not found, redirect to documents list
+            navigate('/documents');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching document:', error);
+        if (isMounted) {
+          navigate('/documents');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingDocument(false);
+        }
+      }
     }
-  }, [id, getDocument, navigate]);
-  
+
+    fetchDocument();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, [id]); // Only re-run when id changes
+
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setCurrentPage(newPage);
     }
   };
-  
+
   const handleSendDocument = async () => {
     if (!document) return;
-    
+
     // Validate the document is ready to send
     if (document.signers.length === 0) {
       alert('You need to add at least one signer before sending the document.');
       return;
     }
-    
+
     setIsSending(true);
-    
+
     try {
       const updatedDoc = await sendDocument(document.id);
       setDocument(updatedDoc);
@@ -68,19 +97,19 @@ const DocumentView: React.FC = () => {
       setIsSending(false);
     }
   };
-  
+
   const downloadDocument = () => {
     if (!document) return;
-    
+
     // Create an anchor element and trigger download
     const a = document.createElement('a');
-    a.href = document.fileUrl;
+    a.href = document.file;
     a.download = `${document.title}.pdf`;
     a.click();
   };
-  
+
   const formatActionText = (action: string): string => {
-    switch(action) {
+    switch (action) {
       case 'document_created': return 'Document created';
       case 'document_uploaded': return 'Document uploaded';
       case 'document_sent': return 'Document sent for signature';
@@ -92,15 +121,15 @@ const DocumentView: React.FC = () => {
       default: return action.replace(/_/g, ' ');
     }
   };
-  
-  if (isLoading || !document) {
+
+  if (isLoadingDocument || !document) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
       </div>
     );
   }
-  
+  console.log(document)
   return (
     <div className="animate-fade-in space-y-6">
       {/* Header */}
@@ -133,7 +162,7 @@ const DocumentView: React.FC = () => {
             {document.status === 'declined' && <AlertTriangle className="h-4 w-4 mr-1" />}
             {document.status.charAt(0).toUpperCase() + document.status.slice(1)}
           </span>
-          
+
           <div className="flex space-x-2">
             <Button
               variant="outline"
@@ -142,13 +171,14 @@ const DocumentView: React.FC = () => {
             >
               Download
             </Button>
-            
+
             {document.status === 'draft' && (
               <>
                 <Button
-                  as={Link}
-                  to={`/documents/edit/${document.id}`}
                   variant="outline"
+                  onClick={()=>{
+                    navigate(`/documents/edit/${document.id}`)
+                  }}
                 >
                   Edit
                 </Button>
@@ -162,7 +192,7 @@ const DocumentView: React.FC = () => {
                 </Button>
               </>
             )}
-            
+
             <Button
               variant={isAuditTrailOpen ? 'primary' : 'outline'}
               onClick={() => setIsAuditTrailOpen(!isAuditTrailOpen)}
@@ -173,7 +203,7 @@ const DocumentView: React.FC = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Main content */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Left panel - Document info */}
@@ -183,12 +213,12 @@ const DocumentView: React.FC = () => {
             <CardBody>
               <SignersList
                 signers={document.signers}
-                onAddSigner={() => {}}
+                onAddSigner={() => { }}
                 readOnly={true}
               />
             </CardBody>
           </Card>
-          
+
           {/* Audit trail panel (visible when activated) */}
           {isAuditTrailOpen && (
             <Card>
@@ -197,8 +227,8 @@ const DocumentView: React.FC = () => {
               </CardHeader>
               <CardBody className="p-0 max-h-96 overflow-y-auto">
                 <div className="divide-y divide-gray-200">
-                  {document.auditTrail
-                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  {/* .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) */}
+                  {document.audit_trail
                     .map((event) => (
                       <div key={event.id} className="py-3 px-4 hover:bg-gray-50">
                         <div className="flex items-start">
@@ -231,13 +261,13 @@ const DocumentView: React.FC = () => {
             </Card>
           )}
         </div>
-        
+
         {/* Main content - PDF viewer */}
         <div className="flex-1">
           <Card className="overflow-hidden">
             <CardBody className="p-4">
               <PDFViewer
-                fileUrl={document.fileUrl}
+                fileUrl={document.file}
                 currentPage={currentPage}
                 scale={scale}
                 onTotalPagesChange={setTotalPages}

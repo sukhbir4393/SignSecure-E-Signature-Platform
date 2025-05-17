@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, FileSignature as Signature, FileText, Calendar, CheckSquare, Edit, UserPlus, Save, Send } from 'lucide-react';
 import { useDocuments } from '../../contexts/DocumentContext';
-import { FormField, Signer } from '../../types';
+import { FormField, Signer,Document } from '../../types';
 import Card, { CardBody, CardHeader, CardFooter } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import PDFViewer from '../../components/document/PDFViewer';
@@ -16,7 +16,7 @@ const DocumentEditor: React.FC = () => {
   const navigate = useNavigate();
   const { getDocument, updateDocument, addSigner, addField, sendDocument, isLoading } = useDocuments();
   
-  const [document, setDocument] = useState(getDocument(id || ''));
+  const [document, setDocument] = useState<Document>();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [scale, setScale] = useState(1.0);
@@ -26,19 +26,48 @@ const DocumentEditor: React.FC = () => {
   const [isSignersOpen, setIsSignersOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingDocument, setIsLoadingDocument] = useState(true);
+
   console.log('DocumentEditor: document',document)
   console.log('DocumentEditor: document',selectedTool)
 
   // Update local document when it changes in context
   useEffect(() => {
-    const updatedDoc = getDocument(id || '');
-    if (updatedDoc) {
-      setDocument(updatedDoc);
-    } else {
-      // Document not found, redirect to documents list
-      navigate('/documents');
+    let isMounted = true;
+
+    const fetchDocument = async () => {
+      if (!id) return;
+      
+      try {
+        setIsLoadingDocument(true);
+        const updatedDoc = await getDocument(id);
+        if (isMounted) {
+          if (updatedDoc) {
+            setDocument(updatedDoc);
+          } else {
+            // Document not found, redirect to documents list
+            navigate('/documents');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching document:', error);
+        if (isMounted) {
+          navigate('/documents');
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingDocument(false);
+        }
+      }
     }
-  }, [id, getDocument, navigate]);
+
+    fetchDocument();
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, [id]); // Only re-run when id changes
   
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -169,7 +198,7 @@ const DocumentEditor: React.FC = () => {
     try {
       // Just update the timestamp
       const updatedDoc = await updateDocument(document.id, { 
-        updatedAt: new Date().toISOString() 
+        modifiedAt: new Date().toISOString() 
       });
       setDocument(updatedDoc);
     } catch (error) {
@@ -386,7 +415,7 @@ const DocumentEditor: React.FC = () => {
           <Card className="overflow-hidden">
             <CardBody className="p-4">
               <PDFViewer
-                fileUrl={document.fileUrl}
+                fileUrl={document.file}
                 currentPage={currentPage}
                 scale={scale}
                 onTotalPagesChange={setTotalPages}

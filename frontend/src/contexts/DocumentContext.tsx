@@ -2,10 +2,12 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { Document, Signer, FormField, AuditEvent } from '../types';
 import { mockDocuments } from '../data/mockData';
 import { useUser } from './UserContext';
+import api from '../config/api';
+import axios from 'axios';
 
 interface DocumentContextType {
   documents: Document[];
-  getDocument: (id: string) => Document | undefined;
+  getDocument: (id: string) => Promise<Document>;
   createDocument: (document: Partial<Document>) => Promise<Document>;
   updateDocument: (id: string, updates: Partial<Document>) => Promise<Document>;
   uploadDocument: (file: File, title: string, description?: string) => Promise<Document>;
@@ -23,6 +25,18 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const loadUserDocuments = async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get<Document[]>('/documents/');
+      setDocuments(response.data);
+    } catch (error) {
+      console.error('Failed to load documents:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     // Load documents for the current user
     if (currentUser) {
@@ -32,56 +46,36 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [currentUser]);
 
-  const loadUserDocuments = () => {
+  const getDocument = async (id: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      // In a real app, this would fetch from your backend
-      const userDocs = mockDocuments.filter(doc => doc.ownerId === currentUser?.id);
-      setDocuments(userDocs);
+      const response = await api.get<Document>(`/documents/${id}/`);
+      return response.data;
     } catch (error) {
-      console.error('Failed to load documents:', error);
+      console.error('Error fetching document:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getDocument = (id: string) => {
-    console.log('documents',documents)
-    return documents.find(doc => doc.id === id);
-  };
-
   const createDocument = async (document: Partial<Document>): Promise<Document> => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      const newDocument: Document = {
-        id: `doc-${Date.now()}`,
+      const response = await api.post<Document>('/documents/', {
         title: document.title || 'Untitled Document',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        ownerId: currentUser?.id || '',
+        description: document.description || '',
+        file_type: document.fileType || 'application/pdf',
         status: 'draft',
-        fileUrl: '/sample-documents/sales-agreement.pdf',
-        // fileUrl: document.fileUrl || '',
-        fileType: document.fileType || 'application/pdf',
-        signers: document.signers || [],
-        fields: document.fields || [],
-        auditTrail: [{
-          id: `audit-${Date.now()}`,
-          documentId: `doc-${Date.now()}`,
-          userId: currentUser?.id,
-          email: currentUser?.email,
-          action: 'document_created',
-          timestamp: new Date().toISOString(),
-          ipAddress: '127.0.0.1',
-          userAgent: navigator.userAgent,
-        }],
-        ...document,
-      };
+        ...document
+      });
 
+      const newDocument = response.data;
       setDocuments(prev => [...prev, newDocument]);
       return newDocument;
+    } catch (error) {
+      console.error('Failed to create document:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +90,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return {
             ...doc,
             ...updates,
-            updatedAt: new Date().toISOString(),
+            modifiedAt: new Date().toISOString(),
           };
         }
         return doc;
@@ -127,7 +121,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         title: title || file.name,
         description,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
         ownerId: currentUser?.id || '',
         status: 'draft',
         fileUrl,
@@ -154,72 +148,78 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const addSigner = async (documentId: string, signer: Partial<Signer>): Promise<Document> => {
-    const document = getDocument(documentId);
-    
-    if (!document) {
-      throw new Error('Document not found');
+    setIsLoading(true);
+    try {
+      const response = await api.post<Signer>('/signers/', {
+        document: documentId,
+        email: signer.email || '',
+        name: signer.name || '',
+        role: signer.role || 'signer',
+        order: signer.order || 0,
+        status: 'pending'
+      });
+
+      // return updateDocument(documentId, {
+      //   signers: [...document.signers, newSigner],
+      //   auditTrail: [...document.auditTrail, {
+      //     id: `audit-${Date.now()}`,
+      //     documentId,
+      //     userId: currentUser?.id,
+      //     email: currentUser?.email,
+      //     action: 'signer_added',
+      //     timestamp: new Date().toISOString(),
+      //     details: `Added signer: ${newSigner.email}`,
+      //   }],
+      // });
+      
+      // Refresh the document to get updated signers
+      const updatedDocument = await getDocument(documentId);
+      console.log('updatedDocument',updatedDocument)
+      if (!updatedDocument) {
+        throw new Error('Document not found after adding signer');
+      }
+
+      return updatedDocument;
+    } catch (error) {
+      console.error('Failed to add signer:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-
-    const newSigner: Signer = {
-      id: `signer-${Date.now()}`,
-      email: signer.email || '',
-      name: signer.name || '',
-      role: signer.role || 'signer',
-      order: signer.order || document.signers.length + 1,
-      status: 'pending',
-      ...signer,
-    };
-
-    return updateDocument(documentId, {
-      signers: [...document.signers, newSigner],
-      auditTrail: [...document.auditTrail, {
-        id: `audit-${Date.now()}`,
-        documentId,
-        userId: currentUser?.id,
-        email: currentUser?.email,
-        action: 'signer_added',
-        timestamp: new Date().toISOString(),
-        details: `Added signer: ${newSigner.email}`,
-      }],
-    });
   };
 
   const addField = async (documentId: string, field: Partial<FormField>): Promise<Document> => {
-    const document = getDocument(documentId);
+    const document = await getDocument(documentId);
     
     if (!document) {
       throw new Error('Document not found');
     }
 
-    const newField: FormField = {
-      id: `field-${Date.now()}`,
-      type: field.type || 'signature',
-      x: field.x || 0,
-      y: field.y || 0,
-      width: field.width || 200,
-      height: field.height || 50,
-      page: field.page || 1,
-      required: field.required !== undefined ? field.required : true,
-      signerId: field.signerId || '',
-      ...field,
-    };
+    try {
+      const response = await api.post<FormField>('/fields/', {
+        document: documentId,
+        signer: field.signerId,
+        type: field.type || 'signature',
+        x: field.x || 0,
+        y: field.y || 0,
+        width: field.width || 200,
+        height: field.height || 50,
+        page: field.page || 1,
+        required: field.required !== undefined ? field.required : true,
+        value: field.value || '',
+        label: field.label || ''
+      });
 
-    return updateDocument(documentId, {
-      fields: [...document.fields, newField],
-      auditTrail: [...document.auditTrail, {
-        id: `audit-${Date.now()}`,
-        documentId,
-        userId: currentUser?.id,
-        email: currentUser?.email,
-        action: 'field_added',
-        timestamp: new Date().toISOString(),
-        details: `Added ${newField.type} field`,
-      }],
-    });
+      // Refresh the document to get the updated fields
+      return await getDocument(documentId);
+    } catch (error) {
+      console.error('Error adding field:', error);
+      throw error;
+    }
   };
 
   const sendDocument = async (documentId: string): Promise<Document> => {
-    const document = getDocument(documentId);
+    const document = await getDocument(documentId);
     
     if (!document) {
       throw new Error('Document not found');
@@ -247,20 +247,20 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     signerId: string, 
     fields: Partial<FormField>[]
   ): Promise<Document> => {
-    const document = getDocument(documentId);
+    const document = await getDocument(documentId);
     
     if (!document) {
       throw new Error('Document not found');
     }
 
-    const signer = document.signers.find(s => s.id === signerId);
+    const signer = document.signers.find((s: Signer) => s.id === signerId);
     
     if (!signer) {
       throw new Error('Signer not found');
     }
 
     // Update fields with values
-    const updatedFields = document.fields.map(field => {
+    const updatedFields = document.fields.map((field: FormField) => {
       const updatedField = fields.find(f => f.id === field.id);
       if (updatedField && field.signerId === signerId) {
         return { ...field, ...updatedField };
@@ -269,7 +269,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
 
     // Update signer status
-    const updatedSigners = document.signers.map(s => {
+    const updatedSigners = document.signers.map((s: Signer) => {
       if (s.id === signerId) {
         return { ...s, status: 'signed', signedAt: new Date().toISOString() };
       }
@@ -277,7 +277,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
 
     // Check if all signers have signed
-    const allSigned = updatedSigners.every(s => s.status === 'signed');
+    const allSigned = updatedSigners.every((s: Signer) => s.status === 'signed');
     const newStatus = allSigned ? 'completed' : 'sent';
 
     return updateDocument(documentId, {

@@ -34,7 +34,7 @@ const DocumentsList: React.FC = () => {
   
   // Sort documents by date (newest first)
   const sortedDocuments = [...filteredDocuments].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    (a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime()
   );
   
   const getStatusIcon = (status: string) => {
@@ -217,7 +217,7 @@ const DocumentsList: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(new Date(doc.updatedAt), 'MMM d, yyyy')}
+                        {format(new Date(doc.modifiedAt), 'MMM d, yyyy')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex space-x-2">
