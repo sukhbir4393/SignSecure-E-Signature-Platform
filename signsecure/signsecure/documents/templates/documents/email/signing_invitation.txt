@@ -1,0 +1,13 @@
+Document Signing Request
+
+Hello {{ signer_name }},
+
+You have been requested to sign the document: {{ document_title }}
+
+Please use the link below to review and sign the document:
+{{ signing_url }}
+
+Important: This link will expire in {{ expiry_days }} days.
+
+This is an automated message, please do not reply to this email.
+If you have any questions, please contact the document owner. 

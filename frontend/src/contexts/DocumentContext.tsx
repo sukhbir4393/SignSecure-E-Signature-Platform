@@ -8,6 +8,7 @@ import axios from 'axios';
 interface DocumentContextType {
   documents: Document[];
   getDocument: (id: string) => Promise<Document>;
+  getDocumentForSigning: (id: string,token: string) => Promise<Document>;
   createDocument: (document: Partial<Document>) => Promise<Document>;
   updateDocument: (id: string, updates: Partial<Document>) => Promise<Document>;
   uploadDocument: (file: File, title: string, description?: string) => Promise<Document>;
@@ -45,6 +46,22 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setDocuments([]);
     }
   }, [currentUser]);
+
+
+  const getDocumentForSigning = async (id: string,token: string) => {
+    setIsLoading(true);
+    try {
+      const response = await api.post<Document>(`/documents/${id}/get_document_for_signing/`,{
+        'token':token
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching document:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getDocument = async (id: string) => {
     setIsLoading(true);
@@ -112,36 +129,25 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const uploadDocument = async (file: File, title: string, description?: string): Promise<Document> => {
     setIsLoading(true);
     try {
-      // Simulate file upload and API call
-      // In a real app, this would upload to cloud storage
-      // const fileUrl = URL.createObjectURL(file);
-      const fileUrl = '/sample-documents/sales-agreement.pdf'
-      const newDocument: Document = {
-        id: `doc-${Date.now()}`,
-        title: title || file.name,
-        description,
-        createdAt: new Date().toISOString(),
-        modifiedAt: new Date().toISOString(),
-        ownerId: currentUser?.id || '',
-        status: 'draft',
-        fileUrl,
-        fileType: file.type,
-        signers: [],
-        fields: [],
-        auditTrail: [{
-          id: `audit-${Date.now()}`,
-          documentId: `doc-${Date.now()}`,
-          userId: currentUser?.id,
-          email: currentUser?.email,
-          action: 'document_uploaded',
-          timestamp: new Date().toISOString(),
-          ipAddress: '127.0.0.1',
-          userAgent: navigator.userAgent,
-        }],
-      };
+      const formData = new FormData();
+      formData.append('title', title || file.name);
+      formData.append('description', description || '');
+      formData.append('status', 'draft');
+      formData.append('file', file);
+      formData.append('file_type', file.type);
 
+      const response = await api.post<Document>('/documents/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const newDocument = response.data;
       setDocuments(prev => [...prev, newDocument]);
       return newDocument;
+    } catch (error) {
+      console.error('Failed to upload document:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -219,27 +225,21 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const sendDocument = async (documentId: string): Promise<Document> => {
-    const document = await getDocument(documentId);
-    
-    if (!document) {
-      throw new Error('Document not found');
+    try {
+      // Call the send_for_signature endpoint
+      const response = await api.post<Document>(`/documents/${documentId}/send_for_signature/`);
+      
+      // Refresh the document to get the updated status
+      const updatedDocument = await getDocument(documentId);
+      if (!updatedDocument) {
+        throw new Error('Document not found after sending');
+      }
+
+      return updatedDocument;
+    } catch (error) {
+      console.error('Failed to send document:', error);
+      throw error;
     }
-
-    // Simulate sending emails to signers
-    console.log(`Sending document ${documentId} to signers:`, document.signers);
-
-    return updateDocument(documentId, {
-      status: 'sent',
-      auditTrail: [...document.auditTrail, {
-        id: `audit-${Date.now()}`,
-        documentId,
-        userId: currentUser?.id,
-        email: currentUser?.email,
-        action: 'document_sent',
-        timestamp: new Date().toISOString(),
-        details: `Document sent to ${document.signers.length} signers`,
-      }],
-    });
   };
 
   const signDocument = async (
@@ -302,6 +302,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       value={{
         documents,
         getDocument,
+        getDocumentForSigning,
         createDocument,
         updateDocument,
         uploadDocument,

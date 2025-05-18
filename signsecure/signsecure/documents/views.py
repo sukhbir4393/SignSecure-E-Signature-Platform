@@ -13,6 +13,7 @@ from .signals import (
     document_signed, document_completed, document_uploaded,
     signer_added, field_added
 )
+from .utils import send_signing_emails
 
 # Create your views here.
 
@@ -25,9 +26,11 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
 class DocumentViewSet(viewsets.ModelViewSet):
     serializer_class = DocumentSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
+    lookup_field = 'ref'
 
     def get_queryset(self):
-        return Document.objects.filter(owner=self.request.user)
+        return Document.objects.all()
+        # return Document.objects.filter(owner=self.request.user)
 
     def perform_create(self, serializer):
         document = serializer.save(owner=self.request.user)
@@ -42,16 +45,25 @@ class DocumentViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=['post'])
-    def send_for_signature(self, request, pk=None):
+    def send_for_signature(self, request, *args, **kwargs):
         document = self.get_object()
-        if document.status != 'draft':
+        if document.status == 'completed':
             return Response(
-                {'error': 'Only draft documents can be sent for signature'},
+                {'error': 'Only draft or sent documents can be sent for signature'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        document.status = 'sent'
+        if document.status == 'sent':
+            document.status = 'sent'
+        else:
+            document.status = 'sent'
         document.save()
+        
+        # Send emails to all signers
+        try:
+            send_signing_emails(document)
+        except Exception as e:
+            # Log the error but don't fail the request
+            print(f"Error sending emails: {str(e)}")
         
         document_sent.send(
             sender=self.__class__,
@@ -65,9 +77,28 @@ class DocumentViewSet(viewsets.ModelViewSet):
         
         return Response({'status': 'document sent for signature'})
 
+    @action(detail=True, methods=['post'],permission_classes=[permissions.AllowAny])
+    def get_document_for_signing(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        token = self.request.data.get('token')
+
+        result = serializer.data
+
+        if token:
+            current_signer = Signer.objects.filter(token=token).first()
+
+            current_signer.viewed_at = timezone.now()
+            current_signer.save()
+            signer_serializer = SignerSerializer(instance=current_signer)
+
+            result['current_signer'] = signer_serializer.data
+
+        return Response(result)
 class SignerViewSet(viewsets.ModelViewSet):
     serializer_class = SignerSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'ref'
 
     def get_queryset(self):
         return Signer.objects.filter(document__owner=self.request.user)
@@ -150,6 +181,7 @@ class SignerViewSet(viewsets.ModelViewSet):
 class FormFieldViewSet(viewsets.ModelViewSet):
     serializer_class = FormFieldSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'ref'
 
     def get_queryset(self):
         return FormField.objects.filter(document__owner=self.request.user)
@@ -169,6 +201,7 @@ class FormFieldViewSet(viewsets.ModelViewSet):
 class AuditEventViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AuditEventSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'ref'
 
     def get_queryset(self):
         return AuditEvent.objects.filter(document__owner=self.request.user)

@@ -28,7 +28,7 @@ export interface FormField {
   height: number;
   page: number;
   required: boolean;
-  signerId: string;
+  signer: string;
   value?: string;
   label?: string;
 }
@@ -47,6 +47,7 @@ export interface Document {
   signers: Signer[];
   fields: FormField[];
   audit_trail: AuditEvent[];
+  current_signer?: Signer
 }
 
 export interface AuditEvent {

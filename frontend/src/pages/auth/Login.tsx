@@ -46,7 +46,7 @@ const Login: React.FC = () => {
   };
   
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in max-w-lg ">
       <div className="text-center mb-8">
         <h2 className="text-3xl font-bold text-primary-700">Welcome back</h2>
         <p className="mt-2 text-gray-600">Sign in to your account to continue</p>

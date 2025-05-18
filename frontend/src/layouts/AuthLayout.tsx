@@ -17,7 +17,7 @@ const AuthLayout: React.FC = () => {
 
       {/* Main content */}
       <div className="flex-1 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md space-y-8">
+        <div className="w-full space-y-8 flex-1 flex items-center justify-center  ">
           <Outlet />
         </div>
       </div>

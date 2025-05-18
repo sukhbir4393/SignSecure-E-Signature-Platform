@@ -13,7 +13,7 @@ import { FormField ,Document} from '../../types';
 const SignDocument: React.FC = () => {
   const { documentId, token } = useParams<{ documentId: string; token: string }>();
   const navigate = useNavigate();
-  const { getDocument, signDocument } = useDocuments();
+  const { getDocumentForSigning, signDocument } = useDocuments();
   
   // const [document, setDocument] = useState(getDocument(documentId || ''));
   const [document, setDocument] = useState<Document>();
@@ -33,45 +33,60 @@ const SignDocument: React.FC = () => {
   
   // Validate token and find signer
   useEffect(() => {
-    if (!document || !token) {
-      navigate('/login');
-      return;
-    }
-    
-    // In a real app, you would validate the token against the backend
-    // Here we're just simulating this by finding a matching signer
-    const signer = document.signers.find(s => s.id === token);
-    
-    if (!signer) {
-      navigate('/login');
-      return;
-    }
-    
-    setSignerId(signer.id);
-    setSignerName(signer.name);
-    
-    // Initialize field values
-    const initialValues: { [key: string]: string } = {};
-    document.fields
-      .filter(field => field.signerId === signer.id)
-      .forEach(field => {
-        if (field.value) {
-          initialValues[field.id] = field.value;
+    const fetchDocument = async () => {
+      if (!documentId || !token) {
+        return;
+      }
+
+      try {
+        const doc = await getDocumentForSigning(documentId, token);
+        setDocument(doc);
+
+        if (!doc) {
+          return;
         }
-      });
-    
-    setFieldValues(initialValues);
-  }, [document, token, navigate]);
+
+        // Find the current signer
+        const currentSigner = doc.current_signer;
+        if (!currentSigner) {
+          return;
+        }
+
+        setSignerId(currentSigner.id);
+        setSignerName(currentSigner.name);
+
+        // Initialize field values
+        const initialValues: { [key: string]: string } = {};
+        doc.fields
+          .filter(field => field.signer === currentSigner.id)
+          .forEach(field => {
+            if (field.value) {
+              initialValues[field.id] = field.value;
+            }
+          });
+
+        setFieldValues(initialValues);
+      } catch (error) {
+        console.error('Error fetching document:', error);
+        // Handle error appropriately
+      }
+    };
+
+    fetchDocument();
+  }, [documentId, token]); // Only re-run if documentId or token changes
   
-  // Update document when it changes in context
-  useEffect(() => {
-    const updatedDoc = getDocument(documentId || '');
-    if (updatedDoc) {
-      setDocument(updatedDoc);
-    } else {
-      navigate('/login');
-    }
-  }, [documentId, getDocument, navigate]);
+  // // Update document when it changes in context
+  // useEffect( () => {
+  //   const findDocument = async() =>{
+  //     const updatedDoc = await getDocument(documentId || '');
+  //     if (updatedDoc) {
+  //       setDocument(updatedDoc);
+  //     } else {
+  //       navigate('/login');
+  //     }
+  //   }
+  //   findDocument()
+  // }, [documentId, getDocument, navigate]);
   
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
@@ -208,7 +223,7 @@ const SignDocument: React.FC = () => {
   );
   
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 animate-fade-in">
+    <div className="w-full max-w-3xl mx-auto py-8 px-4 sm:px-6 lg:px-8 animate-fade-in">
       {/* Success message */}
       {showSuccess && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
@@ -256,7 +271,7 @@ const SignDocument: React.FC = () => {
       <Card className="overflow-hidden">
         <CardBody className="p-4">
           <PDFViewer
-            fileUrl={document.fileUrl}
+            fileUrl={document.file}
             currentPage={currentPage}
             scale={scale}
             onTotalPagesChange={setTotalPages}
@@ -270,10 +285,10 @@ const SignDocument: React.FC = () => {
                   key={field.id}
                   field={{
                     ...field,
-                    value: field.signerId === signerId ? fieldValues[field.id] : field.value
+                    value: field.signer === signerId ? fieldValues[field.id] : field.value
                   }}
                   isSelected={currentField?.id === field.id}
-                  onClick={() => field.signerId === signerId && handleFieldClick(field)}
+                  onClick={() => field.signer === signerId && handleFieldClick(field)}
                 />
               ))}
           </PDFViewer>

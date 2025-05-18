@@ -26,7 +26,7 @@ function App() {
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
               <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-              <Route path="/sign/:documentId/:token" element={<SignDocument />} />
+              <Route path="/sign/:documentId/:token" element={<PublicRoute><SignDocument /></PublicRoute>} />
               <Route path="/signing-complete" element={<SigningComplete />} />
             </Route>
 

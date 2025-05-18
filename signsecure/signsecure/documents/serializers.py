@@ -1,15 +1,19 @@
 from rest_framework import serializers
 from .models import Document, Signer, FormField, AuditEvent
 from django.contrib.auth import get_user_model
-
+from core import fields
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
+    id = fields.PrimaryRefField(read_only=True)
     class Meta:
         model = User
         fields = ['id', 'email', 'first_name', 'last_name']
 
 class FormFieldSerializer(serializers.ModelSerializer):
+    id = fields.PrimaryRefField(read_only=True)
+    signer = fields.UUIDRelatedField(queryset=Signer.objects.all())
+    
     class Meta:
         model = FormField
         fields = [
@@ -19,6 +23,7 @@ class FormFieldSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'modified_at']
 
 class SignerSerializer(serializers.ModelSerializer):
+    id = fields.PrimaryRefField(read_only=True)
     fields = FormFieldSerializer(many=True, read_only=True)
     
     class Meta:
@@ -32,6 +37,7 @@ class SignerSerializer(serializers.ModelSerializer):
 
 
 class AuditEventSerializer(serializers.ModelSerializer):
+    id = fields.PrimaryRefField(read_only=True)
     user = UserSerializer(read_only=True)
     # document = DocumentSerializer(read_only=True)
     
@@ -44,6 +50,7 @@ class AuditEventSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'modified_at', 'timestamp'] 
 
 class DocumentSerializer(serializers.ModelSerializer):
+    id = fields.PrimaryRefField(read_only=True)
     owner = UserSerializer(read_only=True)
     signers = SignerSerializer(many=True, read_only=True)
     fields = FormFieldSerializer(many=True, read_only=True)
