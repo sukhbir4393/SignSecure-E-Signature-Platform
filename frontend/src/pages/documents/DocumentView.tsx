@@ -39,7 +39,7 @@ const DocumentView: React.FC = () => {
 
     const fetchDocument = async () => {
       if (!id) return;
-      
+
       try {
         setIsLoadingDocument(true);
         const updatedDoc = await getDocument(id);
@@ -176,7 +176,7 @@ const DocumentView: React.FC = () => {
               <>
                 <Button
                   variant="outline"
-                  onClick={()=>{
+                  onClick={() => {
                     navigate(`/documents/edit/${document.id}`)
                   }}
                 >

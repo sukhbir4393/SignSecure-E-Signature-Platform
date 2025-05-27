@@ -77,22 +77,26 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
   }, [currentPage]);
 
   return (
-    <div className="pdf-viewer relative" ref={containerRef}         onClick={handlePageClick}>
+    <div className="pdf-viewer relative"  onClick={handlePageClick}>
       <div 
-        className={`relative ${isEditable ? 'cursor-crosshair' : ''}`}
-
-      >
+        className={`relative ${isEditable ? 'cursor-crosshair' : ''}`} >
         <Document
           file={fileUrl}
           onLoadSuccess={onDocumentLoadSuccess}
-          className="mx-auto shadow-md"
+
         >
+          <div
+            ref={containerRef}
+          >
           <Page 
             pageNumber={pageNumber} 
             scale={scale}
             renderTextLayer={false}
             renderAnnotationLayer={false}
+            width={900}
+            className={'shadow-2xl'}
           />
+          </div>
         </Document>
       </div>
       

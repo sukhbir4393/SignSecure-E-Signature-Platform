@@ -13,6 +13,7 @@ class UserSerializer(serializers.ModelSerializer):
 class FormFieldSerializer(serializers.ModelSerializer):
     id = fields.PrimaryRefField(read_only=True)
     signer = fields.UUIDRelatedField(queryset=Signer.objects.all())
+    document = fields.UUIDRelatedField(queryset=Document.objects.all())
     
     class Meta:
         model = FormField
@@ -24,7 +25,10 @@ class FormFieldSerializer(serializers.ModelSerializer):
 
 class SignerSerializer(serializers.ModelSerializer):
     id = fields.PrimaryRefField(read_only=True)
+    document = fields.UUIDRelatedField(queryset=Document.objects.all())
     fields = FormFieldSerializer(many=True, read_only=True)
+
+ 
     
     class Meta:
         model = Signer

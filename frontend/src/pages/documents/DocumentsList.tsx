@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link ,useNavigate} from 'react-router-dom';
 import { 
   FileText, 
   Search, 
@@ -24,7 +24,7 @@ const DocumentsList: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<DocumentStatus>('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  
+  const navigate = useNavigate();
   // Handle search and filtering
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -34,7 +34,7 @@ const DocumentsList: React.FC = () => {
   
   // Sort documents by date (newest first)
   const sortedDocuments = [...filteredDocuments].sort(
-    (a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime()
+    (a, b) => new Date(b.modified_at).getTime() - new Date(a.modified_at).getTime()
   );
   
   const getStatusIcon = (status: string) => {
@@ -84,10 +84,11 @@ const DocumentsList: React.FC = () => {
           <p className="text-gray-600 mt-1">Manage and track all your documents</p>
         </div>
         <Button
-          as={Link}
-          to="/documents/upload"
           variant="primary"
           leftIcon={<Plus className="h-4 w-4" />}
+          onClick={()=>{
+            navigate("/documents/upload")
+          }}
         >
           New Document
         </Button>
@@ -217,25 +218,27 @@ const DocumentsList: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(new Date(doc.modifiedAt), 'MMM d, yyyy')}
+                        {format(new Date(doc.modified_at), 'MMM d, yyyy')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <div className="flex space-x-2">
                           {doc.status === 'draft' && (
                             <Button
-                              as={Link}
-                              to={`/documents/edit/${doc.id}`}
                               variant="outline"
                               size="sm"
+                              onClick={()=>{
+                                navigate(`/documents/edit/${doc.id}`)
+                              }}
                             >
                               Edit
                             </Button>
                           )}
                           <Button
-                            as={Link}
-                            to={`/documents/view/${doc.id}`}
                             variant="ghost"
                             size="sm"
+                            onClick={()=>{
+                              navigate(`/documents/view/${doc.id}`)
+                            }}
                           >
                             View
                           </Button>
@@ -255,10 +258,11 @@ const DocumentsList: React.FC = () => {
               </p>
               <div className="mt-6">
                 <Button
-                  as={Link}
-                  to="/documents/upload"
                   variant="primary"
                   leftIcon={<Plus className="h-4 w-4" />}
+                  onClick={()=>{
+                    navigate("/documents/upload")
+                  }}
                 >
                   New Document
                 </Button>

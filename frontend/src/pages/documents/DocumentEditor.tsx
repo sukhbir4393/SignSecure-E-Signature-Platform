@@ -87,7 +87,7 @@ const DocumentEditor: React.FC = () => {
       height: selectedTool === 'checkbox' ? 40 : 50,
       page: currentPage,
       required: true,
-      signerId: selectedSigner,
+      signer: selectedSigner,
     };
     
     if (selectedTool === 'text') {
@@ -149,11 +149,11 @@ const DocumentEditor: React.FC = () => {
     }
   };
   
-  const handleRemoveSigner = async (signerId: string) => {
+  const handleRemoveSigner = async (signer: string) => {
     if (!document) return;
     
     // First check if this signer has any fields
-    const signerHasFields = document.fields.some(field => field.signerId === signerId);
+    const signerHasFields = document.fields.some(field => field.signer === signer);
     
     if (signerHasFields) {
       // Show confirmation dialog
@@ -164,7 +164,7 @@ const DocumentEditor: React.FC = () => {
       if (!confirmed) return;
       
       // Remove signer's fields
-      const fieldsToKeep = document.fields.filter(field => field.signerId !== signerId);
+      const fieldsToKeep = document.fields.filter(field => field.signer !== signer);
       
       // Update the document with remaining fields
       try {
@@ -177,12 +177,12 @@ const DocumentEditor: React.FC = () => {
     
     // Now remove the signer
     try {
-      const updatedSigners = document.signers.filter(signer => signer.id !== signerId);
+      const updatedSigners = document.signers.filter(signe => signe.id !== signer);
       const updatedDoc = await updateDocument(document.id, { signers: updatedSigners });
       setDocument(updatedDoc);
       
       // If the selected signer was removed, clear selection
-      if (selectedSigner === signerId) {
+      if (selectedSigner === signer) {
         setSelectedSigner(null);
       }
     } catch (error) {
@@ -198,7 +198,7 @@ const DocumentEditor: React.FC = () => {
     try {
       // Just update the timestamp
       const updatedDoc = await updateDocument(document.id, { 
-        modifiedAt: new Date().toISOString() 
+        modified_at: new Date().toISOString() 
       });
       setDocument(updatedDoc);
     } catch (error) {
@@ -218,8 +218,8 @@ const DocumentEditor: React.FC = () => {
     }
     
     const signerIds = document.signers.map(signer => signer.id);
-    const allSignersHaveFields = signerIds.every(signerId => 
-      document.fields.some(field => field.signerId === signerId)
+    const allSignersHaveFields = signerIds.every(signer => 
+      document.fields.some(field => field.signer === signer)
     );
     
     if (!allSignersHaveFields) {
@@ -413,7 +413,7 @@ const DocumentEditor: React.FC = () => {
         {/* Main content - PDF viewer */}
         <div className="flex-1">
           <Card className="overflow-hidden">
-            <CardBody className="p-4">
+            <CardBody className="">
               <PDFViewer
                 fileUrl={document.file}
                 currentPage={currentPage}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FileText, Upload, Clock, CheckCircle, AlertTriangle, FileSignature } from 'lucide-react';
 import { useDocuments } from '../../contexts/DocumentContext';
 import { useUser } from '../../contexts/UserContext';
@@ -9,8 +9,9 @@ import { format } from 'date-fns';
 
 const Dashboard: React.FC = () => {
   const { documents, isLoading } = useDocuments();
+  const navigate = useNavigate();
   const { currentUser } = useUser();
-  
+
   // Calculate document statistics
   const stats = {
     draft: documents.filter(doc => doc.status === 'draft').length,
@@ -18,15 +19,15 @@ const Dashboard: React.FC = () => {
     completed: documents.filter(doc => doc.status === 'completed').length,
     all: documents.length
   };
-  
+
   // Get recent documents (up to 5)
   const recentDocuments = [...documents]
-    .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
+    .sort((a, b) => new Date(b.modified_at).getTime() - new Date(a.modified_at).getTime())
     .slice(0, 5);
-  
+
   // Get documents waiting for signatures
   const waitingForSignature = documents.filter(doc => doc.status === 'sent');
-  
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -34,7 +35,7 @@ const Dashboard: React.FC = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="animate-fade-in space-y-8">
       {/* Header section */}
@@ -45,16 +46,19 @@ const Dashboard: React.FC = () => {
         </div>
         <div className="mt-4 md:mt-0 flex space-x-3">
           <Button
-            as={Link}
-            to="/documents/upload"
             variant="primary"
-            leftIcon={<Upload className="h-4 w-4" />}
+            leftIcon={<Upload className="h-4 w-4"
+
+            />}
+            onClick={() => {
+              navigate("/documents/upload")
+            }}
           >
             Upload Document
           </Button>
         </div>
       </div>
-      
+
       {/* Stats cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-white">
@@ -68,7 +72,7 @@ const Dashboard: React.FC = () => {
             </div>
           </CardBody>
         </Card>
-        
+
         <Card className="bg-white">
           <CardBody className="flex items-center py-6">
             <div className="rounded-full bg-secondary-100 p-3 mr-4">
@@ -80,7 +84,7 @@ const Dashboard: React.FC = () => {
             </div>
           </CardBody>
         </Card>
-        
+
         <Card className="bg-white">
           <CardBody className="flex items-center py-6">
             <div className="rounded-full bg-warning-100 p-3 mr-4">
@@ -92,7 +96,7 @@ const Dashboard: React.FC = () => {
             </div>
           </CardBody>
         </Card>
-        
+
         <Card className="bg-white">
           <CardBody className="flex items-center py-6">
             <div className="rounded-full bg-success-100 p-3 mr-4">
@@ -105,7 +109,7 @@ const Dashboard: React.FC = () => {
           </CardBody>
         </Card>
       </div>
-      
+
       {/* Recent documents section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -136,8 +140,8 @@ const Dashboard: React.FC = () => {
                               {doc.title}
                             </Link>
                             <p className="text-sm text-gray-500">
-                              {/* Updated {format(new Date(doc.modifiedAt), 'MMM d, yyyy')} */}
-                              Updated {doc.modifiedAt}
+                              {/* Updated {format(new Date(doc.modified_at), 'MMM d, yyyy')} */}
+                              Updated {doc.modified_at}
                             </p>
                           </div>
                         </div>
@@ -158,12 +162,13 @@ const Dashboard: React.FC = () => {
               ) : (
                 <div className="py-8 text-center text-gray-500">
                   <p>No documents yet</p>
-                  <Button 
-                    as={Link} 
-                    to="/documents/upload" 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="mt-2"
+                    onClick={() => {
+                      navigate("/documents/upload")
+                    }}
                   >
                     Upload your first document
                   </Button>
@@ -172,7 +177,7 @@ const Dashboard: React.FC = () => {
             </CardBody>
           </Card>
         </div>
-        
+
         <div>
           <Card className="bg-white h-full">
             <CardHeader>
@@ -187,7 +192,7 @@ const Dashboard: React.FC = () => {
                         <p className="font-medium text-gray-900">{doc.title}</p>
                         <div className="mt-1 flex flex-wrap gap-2">
                           {doc.signers.map(signer => (
-                            <div 
+                            <div
                               key={signer.id}
                               className={`inline-flex items-center px-2 py-1 rounded-full text-xs
                                 ${signer.status === 'signed' ? 'bg-success-100 text-success-800' : 'bg-gray-100 text-gray-800'}
